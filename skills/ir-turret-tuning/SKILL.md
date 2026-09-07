@@ -56,6 +56,16 @@ Note the kit ships with a **USB battery pack**; USB *is* the normal power path. 
 was still slow" does **not** rule out power — a Nano's USB rail sits near 4.5 V behind a 500 mA
 polyfuse, often weaker than batteries.
 
+## Step 3.5 — Try the tape fix before tuning
+
+CrunchLabs' troubleshooting guide recommends lining the back metal ring with one or two layers of
+**frosted** Scotch tape. This cuts friction and spaces the magnets further apart, weakening the
+holding force the roll servo must break away from at the start of every shot.
+
+Suggest this **before** laddering timing values. Breakaway from a standstill is the hardest moment
+in the firing cycle, and a barrel that sticks intermittently cannot be tuned reliably. If the tape
+fixes the stall outright, no code change is needed.
+
 ## Step 4 — Separate rotation from release
 
 Ask the user to mark the barrel with tape and mark the body.

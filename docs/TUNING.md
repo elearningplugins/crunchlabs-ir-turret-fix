@@ -34,6 +34,13 @@ Both sketches accept single-character commands at **115200 baud**. Open the seri
 > Opening the serial port **resets the board**, so tuned values revert to the compiled defaults.
 > Once you find numbers you like, edit them in the sketch and upload.
 
+## Before you tune anything
+
+Try the tape fix from CrunchLabs' troubleshooting guide first: one or two layers of **frosted**
+Scotch tape on the back metal ring. It cuts friction and spaces the magnets apart, which weakens the
+holding force the servo has to break away from on every shot. A barrel that sticks intermittently
+cannot be tuned reliably, because you will be fitting numbers to a moving target.
+
 ## Procedure
 
 **1. Confirm it's a rotation problem.**

@@ -74,9 +74,34 @@ Shot times become **240, 250, 260, 270, 280, 290 ms**.
 | `yawPrecision` 150 to 70 | Left and right blocked for 150 ms per press |
 | Live serial tuning | Change values over USB without uploading again |
 
-## Before you blame the code
+## Try the tape fix first
 
-Check these first, because they cause the same symptoms.
+This one is from CrunchLabs' own [turret troubleshooting guide](https://ide.crunchlabs.com/troubleshooting/turret),
+and it is the fastest thing to try if your barrel will not spin.
+
+**Line the back metal ring of the turret with one or two layers of Scotch tape.**
+Use the **frosted** style rather than the clear style.
+
+It works for two reasons at once:
+
+1. The frosted surface **reduces friction** where the barrel rides on the ring.
+2. The tape adds **space between the magnets**, which weakens their pull.
+
+That second one matters more than it sounds. The magnets hold the barrel against the ring, and that
+holding force is exactly what the roll servo has to overcome every time it starts from a standstill.
+Weaken it slightly and the servo breaks away more easily, which is the single hardest moment in the
+whole firing cycle.
+
+Start with one layer. If the barrel still drags, try two. Too much tape and the barrel will sit
+loose, so do not keep stacking it.
+
+Do this before tuning any code. If it fixes the stall on its own, you may not need the timing
+changes at all, and if you do still need them, you will be tuning against a barrel that moves
+consistently instead of one that sometimes sticks.
+
+## Other things to check before you blame the code
+
+These cause the same symptoms.
 
 * **Power.** The kit runs off a USB battery pack. Try a **2 A or better** supply. A Nano's USB path
   sits near 4.5 V and many banks cap at 1 A. In our case the board never browned out, since uptime
