@@ -11,7 +11,7 @@ jobs:
     name: Logic tests and mutation testing
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run both suites plus mutation testing
         run: ./tools/run_tests.sh
 
@@ -19,7 +19,9 @@ jobs:
     name: Compile both sketches for the Arduino Nano
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      # v2.0.0 is the latest release and still targets Node 20, so GitHub logs a
+      # deprecation warning for this step. Nothing to bump until upstream ships a new major.
       - uses: arduino/setup-arduino-cli@v2
       - name: Install core and libraries
         run: |
