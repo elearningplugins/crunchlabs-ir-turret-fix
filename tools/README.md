@@ -1,21 +1,29 @@
 # Tools
 
 Optional. None of this is needed to fix a turret. See
-[The tools folder](../README.md#the-tools-folder) in the main README for what each script does
-and when you would reach for it.
+[The tools folder](../README.md#the-tools-folder) in the main README for what each script does.
 
-Quick reference:
+## Run everything
 
 ```bash
-# logic tests, 328 checks against stubbed hardware
-g++ -std=c++17 -I. tests.cpp stubs.cpp -o tests && ./tests
+./run_tests.sh
+```
 
-# mutation testing, 27 deliberate one line breaks
-python3 mutate.py
+Regenerates both sketches, runs both logic suites, then mutation testing. Needs only `g++` and
+`python3`, and works from a fresh clone. This is what CI runs.
 
-# drive a real turret over USB
+## Pieces
+
+* `generate.py` turns each `.ino` into a `.cpp` the harness can compile, swapping the Arduino
+  headers for the stubs here. The generated files are not committed, so regenerate after editing a sketch.
+* `tests.cpp` covers `my-version/IRTurretMine.ino`.
+* `community_tests.cpp` covers `IRTurret_FixedFiring.ino`.
+* `mutate.py` breaks the sketch 28 ways and checks the tests notice. A pattern that no longer matches
+  the sketch fails the run rather than being skipped quietly.
+* `drive.sh` talks to a real turret over USB.
+
+```bash
 ./drive.sh /dev/cu.usbserial-1420 "s" "tttttt" "s"
 ```
 
-`tests.cpp` includes a generated `sketch.cpp`, which is the `.ino` with its Arduino headers replaced
-by the stubs in this folder. Regenerate it whenever you change the sketch.
+Opening the port resets the board, so anything tuned live goes back to the compiled defaults.

@@ -1,0 +1,39 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  logic-tests:
+    name: Logic tests and mutation testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run both suites plus mutation testing
+        run: ./tools/run_tests.sh
+
+  arduino-build:
+    name: Compile both sketches for the Arduino Nano
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install core and libraries
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+          arduino-cli lib install "IRremote@4.7.1"
+          arduino-cli lib install "Servo"
+      - name: Compile the community sketch
+        run: |
+          mkdir -p /tmp/IRTurret_FixedFiring
+          cp IRTurret_FixedFiring.ino /tmp/IRTurret_FixedFiring/
+          arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328old /tmp/IRTurret_FixedFiring --warnings default
+      - name: Compile the passcode sketch
+        run: |
+          mkdir -p /tmp/IRTurretMine
+          cp my-version/IRTurretMine.ino /tmp/IRTurretMine/
+          arduino-cli compile --fqbn arduino:avr:nano:cpu=atmega328old /tmp/IRTurretMine --warnings default

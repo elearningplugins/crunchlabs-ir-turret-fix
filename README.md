@@ -206,6 +206,11 @@ or any terminal and press keys:
 > Opening the serial port **resets the board**, so tuned values revert to the compiled defaults.
 > Once you find numbers you like, edit them in the sketch and upload.
 
+Both values are clamped. `rollPrecision` is held between 60 and 600 ms and `rollStep` between minus
+40 and 40, and the final per shot time is clamped again before it reaches `delay()`. Without that, a
+negative value would wrap to about 49 days of full speed rotation, since `delay()` takes an unsigned
+argument.
+
 ### Procedure
 
 **1. Confirm it is a rotation problem.**
@@ -358,8 +363,10 @@ of dead time per press**. Removing those prints was the single biggest responsiv
 
 The logic was extracted and run against stubbed hardware on a desktop: **328 tests**, including an
 exhaustive check of all 10,000 four digit passcodes and a 200,000 iteration randomized property test.
-Mutation testing with 27 hand written mutants scores **85 percent**. The four survivors are two
-equivalent mutants and two deliberately untested tuning constants.
+Mutation testing with 28 hand written mutants scores **85 percent**. The four survivors are two
+equivalent mutants, where the code path is unreachable so no test could tell the difference, and two
+deliberately untested tuning constants. A mutation pattern that no longer matches the sketch is
+treated as a hard failure, so the score cannot quietly rot as the code changes.
 
 Logic tests cannot catch timing, current draw or mechanics. Everything above was confirmed on the
 real turret over USB.
@@ -408,24 +415,27 @@ be checked and so you can repeat the work on your own turret.
 
 | File | What it does | When you would use it |
 |:--|:--|:--|
+| `run_tests.sh` | Runs everything below in one go. Works from a fresh clone. | The one command you actually need. |
+| `generate.py` | Rewrites each `.ino` into a `.cpp` the harness can compile, swapping the Arduino headers for stubs. | Run automatically by `run_tests.sh` after you edit a sketch. |
 | `drive.sh` | Sends command keys to the turret over USB and prints everything it says back. Handles the port opening order and the boot delay for you. | Scripting a repeatable test instead of typing keys by hand. |
-| `tests.cpp` | 328 logic tests: passcode state machine, pitch limit clamping, the firing ramp, buffer overflow safety, plus a 200,000 iteration randomized property test. | You changed the sketch and want to know you did not break anything. |
+| `tests.cpp` | Logic tests for the **passcode** sketch: passcode state machine, pitch limit clamping, the firing ramp, buffer overflow safety, plus a 200,000 iteration randomized property test. | You changed `my-version/IRTurretMine.ino`. |
+| `community_tests.cpp` | Logic tests for the **community** sketch: remote and serial key mapping, the roll time clamp, pitch limits, the ramp, and nod drift. | You changed `IRTurret_FixedFiring.ino`. |
 | `stubs.h`, `stubs.cpp` | Fake `Servo`, `IrReceiver` and `Serial`, plus a virtual clock, so the sketch compiles and runs on a normal computer with no Arduino attached. | Needed by `tests.cpp`. |
 | `mutate.py` | Mutation testing. Makes 27 deliberate one line breaks in the sketch and checks the tests notice. Currently catches 85 percent. | Judging whether the tests are actually worth anything. |
 | `model.py` | Fits a physical model of barrel rotation to real magazine results, estimating servo speed, load effects, peg tolerance and per shot noise. | Understanding why your turret misses, rather than guessing. |
 | `optimize.py` | Monte Carlo search over base and ramp combinations using that fitted model. | Narrowing which settings are worth testing on real darts. |
 | `bestramp.py` | Finds the best base for each ramp value at high precision. | Answering "does ramp direction even matter", which it turns out barely does. |
 
-**Run the logic tests:**
+**Run everything:**
 
 ```bash
-cd tools
-g++ -std=c++17 -I. tests.cpp stubs.cpp -o tests && ./tests
-python3 mutate.py
+./tools/run_tests.sh
 ```
 
-`tests.cpp` includes a generated `sketch.cpp`, which is the `.ino` with its Arduino headers swapped
-for the stubs. The comments at the top of `tests.cpp` show how to regenerate it.
+That regenerates both sketches, runs both test suites and then mutation testing. It needs only
+`g++` and `python3`, and it works from a fresh clone. The same script runs in
+[CI](.github/workflows/tests.yml) on every push, alongside a real `arduino-cli` compile of both
+sketches for the Nano.
 
 **Drive the turret:**
 

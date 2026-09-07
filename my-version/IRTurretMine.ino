@@ -37,6 +37,10 @@
 
 #include <Arduino.h>
 #include <Servo.h>
+//DECODE_NEC must be defined BEFORE IRremote.hpp is included, or the library compiles its whole
+//default protocol set instead of just NEC - that wastes flash and lets other protocols' command
+//bytes reach our handler. Check the boot banner: it should list NEC only.
+#define DECODE_NEC
 #include <IRremote.hpp>
 
 #pragma endregion LIBRARIES
@@ -72,8 +76,6 @@
 #define cmd0 0x19
 #define star 0x16
 #define hashtag 0xD
-
-#define DECODE_NEC  //defines the type of IR transmission to decode based on the remote. See IRremote library for examples on how to decode other types of remote
 
 #pragma endregion IR CODES
 
@@ -111,6 +113,13 @@ int yawStopSpeed = 90; //value to stop the yaw motor - keep this at 90
 int rollMoveSpeed = 90; //this variable is the speed controller for the continuous movement of the ROLL servo motor. It is added or subtracted from the rollStopSpeed, so 0 would mean full speed rotation in one direction, and 180 means full rotation in the other. Keep this at 90 for best performance / highest torque from the roll motor when firing.
 int rollStopSpeed = 90; //value to stop the roll motor - keep this at 90
 
+//safe limits for the live tuning keys - a negative or absurd run time would be handed to delay(),
+//which takes an unsigned long, so a negative value wraps to roughly 49 days of full speed rotation
+#define ROLL_TIME_MIN 60    // ms, shorter than this cannot move a chamber
+#define ROLL_TIME_MAX 600   // ms, longer than this overshoots wildly
+#define ROLL_STEP_MIN -40   // ms per shot
+#define ROLL_STEP_MAX 40
+
 int rollStep = 10; //ms added to rollPrecision for each dart already fired - positive rolls LONGER as the magazine empties
 int dartsFired = 0; //how many shots since the last reload, so the ramp knows where it is in the magazine
 
@@ -124,9 +133,10 @@ void shakeHeadYes(int moves = 3); //function prototypes for shakeHeadYes and No 
 void shakeHeadNo(int moves = 3);
 void handleCommand(int command, bool isRepeat); //function prototype for the command handler used by loop()
 void flushIR(); //function prototype for the IR buffer flush used after long blocking moves
+int constrainRollTime(int ms); //function prototype for the roll time clamp
 void handleSerial(); //DEBUG BUILD: lets a computer drive the turret over USB
 void printStatus(); //DEBUG BUILD: dumps the turret's current state
-void timedFire(); //DEBUG BUILD: fires one dart and reports how long the barrel took
+void timedFire(); //DEBUG BUILD: fires one dart and reports the commanded run time (not actual rotation)
 void spinRoll(int ms); //DEBUG BUILD: runs the roll servo for a measured time so its real speed can be calibrated
 #pragma endregion PINS AND PARAMS
 
@@ -207,6 +217,16 @@ void loop() {
             //  PASSCODE LOGIC  //
 //////////////////////////////////////////////////
 #pragma region PASSCODE LOGIC
+
+int constrainRollTime(int ms) { //keeps any run time we hand to delay() inside a sane, non negative range
+    if (ms < ROLL_TIME_MIN) {
+        return ROLL_TIME_MIN;
+    }
+    if (ms > ROLL_TIME_MAX) {
+        return ROLL_TIME_MAX;
+    }
+    return ms;
+}
 
 void flushIR() { //throws away any button that arrived while a long move was blocking
     if (IrReceiver.decode()) {
@@ -361,14 +381,19 @@ void printStatus() {
     Serial.println(millis());
 }
 
-void timedFire() { //fires one dart and reports the wall-clock time, so a stall shows up as a longer number
+void timedFire() { //fires one dart and reports the commanded run time for this shot
+    //NOTE: this measures how long the code ran the servo, NOT how far the barrel actually turned.
+    //A continuous rotation servo reports no position, so a stalled barrel produces the same numbers
+    //as a healthy one. Only your eyes can tell whether the chamber advanced.
+    int commanded = constrainRollTime(rollPrecision + (rollStep * dartsFired));
     unsigned long t0 = millis();
     fire();
     unsigned long t1 = millis();
-    Serial.print(F("FIRED ms="));
+    Serial.print(F("FIRED elapsed="));
     Serial.print(t1 - t0);
-    Serial.print(F(" expected="));
-    Serial.println(rollPrecision);
+    Serial.print(F(" commanded="));
+    Serial.print(commanded);
+    Serial.println(F(" (commanded time only - watch the barrel to see if it advanced)"));
 }
 
 void spinRoll(int ms) { //runs the barrel at full speed for exactly ms, then stops - used to measure real rotation under load
@@ -411,14 +436,14 @@ void handleSerial() {
         case 't': timedFire();   return; //timed single shot
 
         //live tuning of rollPrecision, so the barrel can be calibrated without re-uploading
-        case '[': rollPrecision -= 10; Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
-        case ']': rollPrecision += 10; Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
-        case '<': rollPrecision -= 2;  Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
-        case '>': rollPrecision += 2;  Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
+        case '[': rollPrecision = constrainRollTime(rollPrecision - 10); Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
+        case ']': rollPrecision = constrainRollTime(rollPrecision + 10); Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
+        case '<': rollPrecision = constrainRollTime(rollPrecision - 2); Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
+        case '>': rollPrecision = constrainRollTime(rollPrecision + 2); Serial.print(F("rollPrecision=")); Serial.println(rollPrecision); return;
 
         //ramp tuning: k/K change how much each successive shot is lengthened, z resets the magazine counter
-        case 'k': rollStep -= 2; Serial.print(F("rollStep=")); Serial.println(rollStep); return;
-        case 'K': rollStep += 2; Serial.print(F("rollStep=")); Serial.println(rollStep); return;
+        case 'k': rollStep = max(ROLL_STEP_MIN, rollStep - 2); Serial.print(F("rollStep=")); Serial.println(rollStep); return;
+        case 'K': rollStep = min(ROLL_STEP_MAX, rollStep + 2); Serial.print(F("rollStep=")); Serial.println(rollStep); return;
         case 'z': dartsFired = 0; Serial.println(F("magazine counter reset")); return;
 
         //calibration spins: measure how far the barrel really goes under load
@@ -506,6 +531,7 @@ void downMove (int moves){ // function to tilt down
 
 void fire() { //function for firing a single dart
     int thisShot = rollPrecision + (rollStep * dartsFired); //ramp the time as the magazine empties
+    thisShot = constrainRollTime(thisShot); //never hand delay() a negative or runaway value
     rollServo.write(rollStopSpeed + rollMoveSpeed);//start rotating the servo
     delay(thisShot);//time for approximately 60 degrees of rotation
     rollServo.write(rollStopSpeed);//stop rotating the servo
@@ -522,7 +548,7 @@ void fire() { //function for firing a single dart
 
 void fireAll() { //function to fire all 6 darts at once
     rollServo.write(rollStopSpeed + rollMoveSpeed);//start rotating the servo
-    delay(rollPrecision * 6); //time for 360 degrees of rotation
+    delay(constrainRollTime(rollPrecision) * 6); //time for 360 degrees of rotation
     rollServo.write(rollStopSpeed);//stop rotating the servo
     delay(5); // delay for smoothness
     //Serial.println("FIRING ALL");
