@@ -41,7 +41,7 @@ exclusive WebSerial access. `lsof /dev/cu.usbserial-XXXX`.
 
 ## Step 2 — Upload the instrumented sketch
 
-Use `community/IRTurret_FixedFiring.ino` from this repo. It adds single-character serial control
+Use `IRTurret_FixedFiring.ino` from this repo. It adds single-character serial control
 without touching the IR path. Keys: `s` status, `t` timed fire, `[`/`]` ±10 ms, `<`/`>` ±2 ms,
 `k`/`K` ramp ±2, `z` reset magazine counter, `H`/`F` calibration spins, `T`/`B` pitch limits.
 
