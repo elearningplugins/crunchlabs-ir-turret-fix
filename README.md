@@ -47,11 +47,59 @@ Shot times become **240, 250, 260, 270, 280, 290 ms**.
 | Path | What it is |
 |:--|:--|
 | [`IRTurret_FixedFiring.ino`](IRTurret_FixedFiring.ino) | **Start here.** All fixes, no passcode. Direct replacement for the stock sketch. |
-| [`my-version/IRTurretMine.ino`](my-version/IRTurretMine.ino) | The author's build. Same fixes plus a four digit passcode lock. |
+| [`my-version/IRTurretMine.ino`](my-version/IRTurretMine.ino) | The author's build. Same fixes plus a passcode lock. See [Which version](#which-version-should-you-use). |
 | [`docs/TUNING.md`](docs/TUNING.md) | How to find the right numbers for *your* servo. |
 | [`docs/FINDINGS.md`](docs/FINDINGS.md) | The full investigation, data and dead ends. |
 | [`skills/ir-turret-tuning/`](skills/ir-turret-tuning/) | An **AI agent skill** that reproduces the whole debugging session. |
 | [`tools/`](tools/) | Serial driver script and the logic test harness. |
+
+## Which version should you use
+
+Both sketches contain **exactly the same fixes** and the same tuned firing values, and both accept
+live tuning over USB. The only difference is the passcode lock and how the remote buttons are mapped.
+
+### IRTurret_FixedFiring.ino (root folder)
+
+The one most people want. The turret is ready to use the moment it powers on.
+
+| Button | Does |
+|:--|:--|
+| Arrows | Aim. Tap for fine aim, hold to travel faster. |
+| OK | Fire one dart |
+| `*` | Fire all six |
+| `#` | Tell the turret you reloaded, so the firing ramp starts over |
+| `1` / `2` | Nod yes / shake no |
+
+### my-version/IRTurretMine.ino
+
+Adds a **four digit passcode lock**. The turret boots **locked** and ignores every aiming and firing
+button until the code is entered. Handy if you want it sitting on a shelf without anyone else
+setting it off.
+
+| Button | Does |
+|:--|:--|
+| `0` to `9` | Enter passcode digits while locked. Checks automatically on the fourth digit, with no enter key. |
+| Arrows, OK | Aim and fire, **only once unlocked** |
+| `#` | Fire all six, once unlocked |
+| `*` | Lock it again |
+| `1` / `2` | Nod yes / shake no, once unlocked |
+
+A correct code makes the turret **nod yes**, a wrong one makes it **shake no**, and the buffer clears
+either way so you can retry freely. Holding a number key is debounced so a single press cannot
+register twice.
+
+The default code is `2468`. Change it at the top of the sketch:
+
+```cpp
+#define PASSCODE_LENGTH 4          // must match the number of digits below
+#define CORRECT_PASSCODE "2468"    // change this to your desired passcode
+```
+
+If you use a different number of digits, change `PASSCODE_LENGTH` to match or the check will never fire.
+
+Two things to know. Because `*` becomes the lock button, **fire all six moves to `#`**, which is why
+that version has no reload reset button. And this is a fun toy lock, not security. There is no
+lockout on wrong guesses.
 
 ## Quick start
 
