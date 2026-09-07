@@ -6,12 +6,16 @@ on:
   pull_request:
   workflow_dispatch:
 
+# these jobs only read the repository, so do not hand them a writable token
+permissions:
+  contents: read
+
 jobs:
   logic-tests:
     name: Logic tests and mutation testing
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run both suites plus mutation testing
         run: ./tools/run_tests.sh
 
@@ -19,10 +23,10 @@ jobs:
     name: Compile both sketches for the Arduino Nano
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # v2.0.0 is the latest release and still targets Node 20, so GitHub logs a
       # deprecation warning for this step. Nothing to bump until upstream ships a new major.
-      - uses: arduino/setup-arduino-cli@v2
+      - uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2.0.0
       - name: Install core and libraries
         run: |
           arduino-cli core update-index
