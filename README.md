@@ -112,6 +112,11 @@ Adds a **four digit passcode lock**. The turret boots **locked** and ignores eve
 button until the code is entered. Handy if you want it sitting on a shelf without anyone else
 setting it off.
 
+> **The passcode is CrunchLabs' design, not ours.** It comes from their official `passcode.ino`
+> turret hack in [HackPackOfficial/HackPack-Code](https://github.com/HackPackOfficial/HackPack-Code),
+> including the nod yes and shake no feedback. This version merges the firing and bug fixes from this
+> repo into it. The nod and shake gestures themselves are in the stock sketch too, on buttons 1 and 2.
+
 | Button | Does |
 |:--|:--|
 | `0` to `9` | Enter passcode digits while locked. Checks automatically on the fourth digit, with no enter key. |
@@ -145,7 +150,7 @@ lockout on wrong guesses.
 | Ramp per shot (`rollStep`) | Load changes as the magazine empties |
 | Removed IR debug prints | About 150 ms of blocking serial output per button press, so the remote felt laggy |
 | Pitch limits clamped | Turret stopped about 5 degrees short of full up and 7 degrees short of full down |
-| Nod restores aim | A nod near a limit silently shifted aim by 15 degrees |
+| Nod restores aim | CrunchLabs' `shakeHeadYes` shifted aim by 15 degrees near a limit and never restored it |
 | IR buffer flush | Buttons pressed during a long move fired late |
 | Repeat flag captured before `resume()` | Race that could double count or drop held presses |
 | `yawPrecision` 150 to 70 | Left and right blocked for 150 ms per press |
@@ -339,8 +344,8 @@ if((pitchServoVal + pitchMoveSpeed) < pitchMax){ ... }   // discards the whole s
 
 With `pitchMoveSpeed = 6` the turret stopped at 144 instead of 150. Fixed with `min()` and `max()`.
 
-**A nod silently moved your aim.** `shakeHeadYes` shifts `pitchServoVal` by 15 degrees to make room
-near a limit and never restores it. Verified on hardware: aim at 33 degrees, nod, still 33 after the fix.
+**A nod silently moved your aim.** `shakeHeadYes`, which is stock CrunchLabs code, shifts
+`pitchServoVal` by 15 degrees to make room near a limit and never restores it. Verified on hardware: aim at 33 degrees, nod, still 33 after the fix.
 
 **The remote was laggy.** Every button press printed about 150 characters of IR diagnostics at 9600
 baud *before* acting. The transmit buffer fills and `Serial.print` blocks, so that is about **150 ms
@@ -456,3 +461,8 @@ Hack Pack IR turret troubleshooting, turret darts will not launch, IRTurret.ino 
 MIT, see [LICENSE](LICENSE). Based on CrunchLabs' IRTurret control code
 (2025 Crunchlabs LLC) and the IRremote library (2020 to 2022 Armin Joachimsmeyer).
 Not affiliated with or endorsed by CrunchLabs.
+
+**What is original here:** the firing timing work (`rollPrecision`, the per shot ramp and the
+tuning method), the bug fixes listed above, the serial tuning interface, the test and simulation
+tools, and the agent skill. **What is not:** the turret sketch itself, the passcode hack, the nod and
+shake gestures, and the frosted tape tip, all of which are CrunchLabs'.

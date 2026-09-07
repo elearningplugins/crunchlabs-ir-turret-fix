@@ -82,6 +82,8 @@
 //////////////////////////////////////////////////
 #pragma region PASSCODE
 
+//the passcode feature below is adapted from CrunchLabs' official passcode.ino turret hack
+//https://github.com/HackPackOfficial/HackPack-Code
 #define PASSCODE_LENGTH 4 // must match the number of digits in CORRECT_PASSCODE below
 #define CORRECT_PASSCODE "2468" // change this to your desired passcode
 
