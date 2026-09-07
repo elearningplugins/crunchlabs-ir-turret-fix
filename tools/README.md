@@ -18,7 +18,7 @@ Regenerates both sketches, runs both logic suites, then mutation testing. Needs 
   headers for the stubs here. The generated files are not committed, so regenerate after editing a sketch.
 * `tests.cpp` covers `my-version/IRTurretMine.ino`.
 * `community_tests.cpp` covers `IRTurret_FixedFiring.ino`.
-* `mutate.py` breaks the sketch 28 ways and checks the tests notice. A pattern that no longer matches
+* `mutate.py` breaks the sketch 30 ways and checks the tests notice. A pattern that no longer matches
   the sketch fails the run rather than being skipped quietly.
 * `drive.sh` talks to a real turret over USB.
 
