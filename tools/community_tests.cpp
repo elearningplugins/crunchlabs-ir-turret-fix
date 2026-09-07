@@ -21,6 +21,9 @@ static void reset_state(){
 static void serial_key(char c){ Serial.inbuf.clear(); Serial.inbuf += c; handleSerial(); }
 
 int main(){
+    const int COMPILED_ROLL_PRECISION = rollPrecision;
+    const int COMPILED_ROLL_STEP      = rollStep;
+
     printf("=== 1. remote buttons ===\n");
     reset_state(); press(ok);
     CHECK(!rollServo.writes.empty(), "OK must fire");
@@ -113,9 +116,35 @@ int main(){
 
     printf("=== 7. tuned defaults ===\n");
     reset_state();
-    CHECK(rollPrecision==240, "rollPrecision default must be 240");
-    CHECK(rollStep==10, "rollStep default must be 10");
+    CHECK(COMPILED_ROLL_PRECISION==240, "rollPrecision must be compiled as 240");
+    CHECK(COMPILED_ROLL_STEP==10, "rollStep must be compiled as 10");
     CHECK(pitchMin==33 && pitchMax==150, "pitch limits must be 33 and 150");
+
+
+    printf("=== 8. spinRoll refuses unsafe durations ===\n");
+    {
+        reset_state(); rollServo.writes.clear();
+        unsigned long t0=g_virtual_ms; spinRoll(-500);
+        CHECK(g_virtual_ms==t0, "spinRoll must refuse a negative duration");
+        CHECK(rollServo.writes.empty(), "a refused spin must not command the servo");
+        t0=g_virtual_ms; spinRoll(999999);
+        CHECK(g_virtual_ms==t0, "spinRoll must refuse a runaway duration");
+        t0=g_virtual_ms; spinRoll(200);
+        CHECK(g_virtual_ms-t0==200, "spinRoll must run a sane duration");
+    }
+
+    printf("=== 9. H and F calibration keys stay bounded ===\n");
+    {
+        reset_state();
+        rollPrecision = 9000;   // an edited compiled default that would overflow int16 when x6
+        unsigned long t0=g_virtual_ms; serial_key('F');
+        unsigned long d=g_virtual_ms-t0;
+        CHECK(d <= (unsigned long)ROLL_TIME_MAX*6, "'F' must stay bounded even with an absurd default");
+        rollPrecision = -400;   // an edited negative default
+        t0=g_virtual_ms; serial_key('H');
+        CHECK(g_virtual_ms-t0 <= (unsigned long)ROLL_TIME_MAX, "'H' must stay bounded with a negative default");
+        printf("  F with rollPrecision=9000 ran %lu ms\n", d);
+    }
 
     printf("\n%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;

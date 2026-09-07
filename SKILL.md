@@ -24,14 +24,32 @@ ls /dev/cu.usbserial-*        # macOS
 ls /dev/ttyUSB*               # Linux
 ```
 
-**Order matters.** Open the file descriptor *first*, then set `stty`, opening resets line settings,
-so setting them first yields garbage at every baud rate:
+**Use `tools/drive.sh` from this repo** rather than hand rolling the serial plumbing:
 
 ```bash
-exec 3<>/dev/cu.usbserial-XXXX
-stty -f /dev/cu.usbserial-XXXX 115200 cs8 -cstopb -parenb raw -echo
-( cat <&3 > out.txt & CP=$!; sleep 3; printf 's' >&3; sleep 1; kill $CP ); exec 3<&-
+./tools/drive.sh /dev/cu.usbserial-XXXX "s"          # ask the turret for its status
+./tools/drive.sh /dev/ttyUSB0 "2468z" "tttttt" "s"   # unlock, reset the counter, six shots
 ```
+
+Each argument after the port is a group of command keys, sent one at a time with a pause between
+groups. The script handles the parts that are easy to get wrong.
+
+If you must do it by hand, two things bite. **Open the file descriptor first, then set `stty`**,
+because opening the port resets the line settings and doing it the other way round yields garbage at
+every baud rate. And **`stty` takes `-f` on macOS but `-F` on Linux**:
+
+```bash
+PORT=/dev/cu.usbserial-XXXX          # or /dev/ttyUSB0 on Linux
+STTY_FLAG=-f; [ "$(uname)" = Linux ] && STTY_FLAG=-F
+OUT=$(mktemp); trap 'rm -f "$OUT"' EXIT
+exec 3<>"$PORT"
+stty $STTY_FLAG "$PORT" 115200 cs8 -cstopb -parenb raw -echo
+( cat <&3 > "$OUT" & CP=$!; sleep 3; printf 's' >&3; sleep 1; kill $CP ); exec 3<&-
+cat "$OUT"
+```
+
+Write captures to `mktemp`, never a fixed name in the working directory, or you will silently
+truncate whatever file happens to share that name.
 
 Opening the port **resets the board**. Expect the boot banner, and expect any live-tuned values to
 revert to compiled defaults.
@@ -119,6 +137,13 @@ instead of clamping, so it stops up to `pitchMoveSpeed` degrees short. Use `min(
 **Nod shifts the aim.** `shakeHeadYes` moves `pitchServoVal` by 15° near a limit and never restores it.
 
 **Stale commands.** IR keeps decoding during long blocking moves; flush after firing and gestures.
+
+## The passcode does not cover USB
+
+In the passcode build, the serial keys `t`, `H`, `F`, `R`, `T` and `B` call movement and firing
+directly without checking the lock. Anyone with a USB cable can fire a locked turret. That is fine
+for a debug build behind physical access, but say so rather than letting someone believe the lock
+covers everything.
 
 ## Safety
 

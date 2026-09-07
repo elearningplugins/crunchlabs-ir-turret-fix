@@ -120,6 +120,7 @@ setting it off.
 | Button | Does |
 |:--|:--|
 | `0` to `9` | Enter passcode digits while locked. Checks automatically on the fourth digit, with no enter key. |
+| `0` | Once unlocked, tells the turret you reloaded so the firing ramp starts over |
 | Arrows, OK | Aim and fire, **only once unlocked** |
 | `#` | Fire all six, once unlocked |
 | `*` | Lock it again |
@@ -138,9 +139,14 @@ The default code is `2468`. Change it at the top of the sketch:
 
 If you use a different number of digits, change `PASSCODE_LENGTH` to match or the check will never fire.
 
-Two things to know. Because `*` becomes the lock button, **fire all six moves to `#`**, which is why
-that version has no reload reset button. And this is a fun toy lock, not security. There is no
-lockout on wrong guesses.
+Because `*` becomes the lock button, **fire all six moves to `#`**, and **`0` becomes the reload
+reset** once unlocked. Press it after loading fresh darts so the firing ramp starts over. Without
+that the counter stays at six and the first shot of your next magazine runs at the longest time in
+the ramp, which is the setting most likely to miss.
+
+**This is a fun toy lock, not security.** There is no lockout on wrong guesses, and the serial
+commands `t`, `H`, `F`, `R`, `T` and `B` fire and move the turret **without checking the lock at
+all**, so anyone with a USB cable can operate a locked turret.
 
 ## Every fix included
 
@@ -361,9 +367,9 @@ of dead time per press**. Removing those prints was the single biggest responsiv
 
 ### Verification
 
-The logic was extracted and run against stubbed hardware on a desktop: **328 tests**, including an
+The logic was extracted and run against stubbed hardware on a desktop: **337 tests** for the passcode sketch and **88** for the community one, including an
 exhaustive check of all 10,000 four digit passcodes and a 200,000 iteration randomized property test.
-Mutation testing with 28 hand written mutants scores **85 percent**. The four survivors are two
+Mutation testing with 30 hand written mutants scores **86 percent**. The four survivors are two
 equivalent mutants, where the code path is unreachable so no test could tell the difference, and two
 deliberately untested tuning constants. A mutation pattern that no longer matches the sketch is
 treated as a hard failure, so the score cannot quietly rot as the code changes.
@@ -421,7 +427,7 @@ be checked and so you can repeat the work on your own turret.
 | `tests.cpp` | Logic tests for the **passcode** sketch: passcode state machine, pitch limit clamping, the firing ramp, buffer overflow safety, plus a 200,000 iteration randomized property test. | You changed `my-version/IRTurretMine.ino`. |
 | `community_tests.cpp` | Logic tests for the **community** sketch: remote and serial key mapping, the roll time clamp, pitch limits, the ramp, and nod drift. | You changed `IRTurret_FixedFiring.ino`. |
 | `stubs.h`, `stubs.cpp` | Fake `Servo`, `IrReceiver` and `Serial`, plus a virtual clock, so the sketch compiles and runs on a normal computer with no Arduino attached. | Needed by `tests.cpp`. |
-| `mutate.py` | Mutation testing. Makes 27 deliberate one line breaks in the sketch and checks the tests notice. Currently catches 85 percent. | Judging whether the tests are actually worth anything. |
+| `mutate.py` | Mutation testing. Makes 30 deliberate one line breaks in the sketch and checks the tests notice. Currently catches 86 percent. A pattern that no longer matches the sketch fails the run. | Judging whether the tests are actually worth anything. |
 | `model.py` | Fits a physical model of barrel rotation to real magazine results, estimating servo speed, load effects, peg tolerance and per shot noise. | Understanding why your turret misses, rather than guessing. |
 | `optimize.py` | Monte Carlo search over base and ramp combinations using that fitted model. | Narrowing which settings are worth testing on real darts. |
 | `bestramp.py` | Finds the best base for each ramp value at high precision. | Answering "does ramp direction even matter", which it turns out barely does. |

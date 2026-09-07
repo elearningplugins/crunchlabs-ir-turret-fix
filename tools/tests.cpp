@@ -13,6 +13,7 @@ static void press(int cmd, bool repeat=false){
 }
 static void reset_state(){
     passcodeEntered = false; passcode[0]='\0';
+    dartsFired = 0; rollPrecision = 240; rollStep = 10;
     pitchServoVal = 100; pitchServo.writes.clear();
     yawServo.writes.clear(); rollServo.writes.clear();
     pitchServo.attached = yawServo.attached = rollServo.attached = true;
@@ -32,6 +33,10 @@ static void assert_pitch_in_range(const char* ctx){
 }
 
 int main(){
+    // capture the values the sketch was compiled with, before any test overwrites them
+    const int COMPILED_ROLL_PRECISION = rollPrecision;
+    const int COMPILED_ROLL_STEP      = rollStep;
+
     printf("=== 1. passcode state machine ===\n");
     reset_state();
     unlock();
@@ -260,8 +265,8 @@ int main(){
     CHECK(pitchMin == 33,  "pitchMin must be 33 (frame clearance)");
     CHECK(PASSCODE_LENGTH == 4, "PASSCODE_LENGTH must be 4");
     CHECK(strcmp(CORRECT_PASSCODE, "2468") == 0, "passcode must be 2468");
-    CHECK(rollPrecision == 240, "rollPrecision must be the tuned 240");
-    CHECK(rollStep == 10, "rollStep must be the tuned +10");
+    CHECK(COMPILED_ROLL_PRECISION == 240, "rollPrecision must be compiled as the tuned 240");
+    CHECK(COMPILED_ROLL_STEP == 10, "rollStep must be compiled as the tuned +10");
     CHECK(rollMoveSpeed == 90 && rollStopSpeed == 90, "roll must stay at full speed");
 
     printf("=== 20. firing timing (virtual clock) ===\n");
@@ -329,6 +334,42 @@ int main(){
         // fireAll resets it
         fireAll();
         CHECK(dartsFired==0, "fireAll must reset the magazine counter");
+    }
+
+
+    printf("=== 25. reload reset on the remote (cmd0 when unlocked) ===\n");
+    {
+        reset_state(); unlock();
+        for(int i=0;i<6;i++) fire();
+        CHECK(dartsFired==6, "six shots must leave the counter at 6");
+        press(cmd0);
+        CHECK(dartsFired==0, "cmd0 when unlocked must reset the magazine counter");
+        // and the next shot must be back at the base time, not the top of the ramp
+        unsigned long t0=g_virtual_ms; fire();
+        int first=(int)(g_virtual_ms-t0);
+        reset_state(); unlock();
+        unsigned long t1=g_virtual_ms; fire();
+        int fresh=(int)(g_virtual_ms-t1);
+        CHECK(first==fresh, "first shot after a reload must match a fresh magazine");
+        printf("  after reload=%d ms, fresh magazine=%d ms\n", first, fresh);
+        // while locked, 0 must still be a passcode digit and must NOT reset anything
+        reset_state(); dartsFired=4;
+        press(cmd0);
+        CHECK(dartsFired==4, "cmd0 while locked must not reset the counter");
+        CHECK(strlen(passcode)==1, "cmd0 while locked must enter a passcode digit");
+    }
+
+    printf("=== 26. spinRoll refuses unsafe durations ===\n");
+    {
+        reset_state(); unlock();
+        rollServo.writes.clear();
+        unsigned long t0=g_virtual_ms; spinRoll(-500);
+        CHECK(g_virtual_ms==t0, "spinRoll must refuse a negative duration");
+        CHECK(rollServo.writes.empty(), "a refused spin must not command the servo");
+        t0=g_virtual_ms; spinRoll(999999);
+        CHECK(g_virtual_ms==t0, "spinRoll must refuse a runaway duration");
+        t0=g_virtual_ms; spinRoll(200);
+        CHECK(g_virtual_ms-t0==200, "spinRoll must run a sane duration");
     }
 
     printf("\n%d checks, %d failures\n", checks, failures);

@@ -310,6 +310,10 @@ void timedFire() { //fires one dart and reports the commanded run time for this 
 }
 
 void spinRoll(int ms) { //runs the barrel at full speed for exactly ms, then stops - used to measure real rotation under load
+    if (ms < 1 || ms > ROLL_TIME_MAX * 6) { //never hand delay() a negative or runaway duration
+        Serial.println(F("SPIN refused - duration out of range"));
+        return;
+    }
     Serial.print(F("SPIN start ms="));
     Serial.println(ms);
     rollServo.write(rollStopSpeed + rollMoveSpeed);
@@ -351,8 +355,8 @@ void handleSerial() {
 
         //calibration spins: measure how far the barrel really goes under load
         case 'R': spinRoll(1000);              return; //one second of rotation
-        case 'F': spinRoll(rollPrecision * 6); return; //what the code thinks is one full turn
-        case 'H': spinRoll(rollPrecision);     return; //what the code thinks is one chamber
+        case 'F': spinRoll(constrainRollTime(rollPrecision) * 6); return; //what the code thinks is one full turn
+        case 'H': spinRoll(constrainRollTime(rollPrecision)); return; //what the code thinks is one chamber
 
         case 'T': { //walk pitch to the top and report where it actually stopped
             for (int i = 0; i < 60; i++) { upMove(1); }
@@ -481,7 +485,6 @@ void shakeHeadYes(int moves) { //sets the default number of nods to 3, but you c
     pitchServo.write(pitchServoVal);
 
     int startAngle = pitchServoVal; // Current position of the pitch servo
-    int lastAngle = pitchServoVal;
     int nodAngle = startAngle + 15; // Angle for nodding motion
 
     for (int i = 0; i < moves; i++) { // Repeat nodding motion three times

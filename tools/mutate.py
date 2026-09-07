@@ -29,6 +29,8 @@ MUTANTS = [
  ("ramp: + -> -",                 "int thisShot = rollPrecision + (rollStep * dartsFired);", "int thisShot = rollPrecision - (rollStep * dartsFired);"),
  ("counter cap removed",         "if (dartsFired < 6) { //stop climbing once the magazine is spent\n      dartsFired++;\n    }", "dartsFired++;"),
  ("fireAll no counter reset",     "dartsFired = 0;\n    flushIR();", "flushIR();"),
+ ("cmd0 reload reset removed",   "dartsFired = 0;\n            Serial.println(F(\"RELOADED\"));", "Serial.println(F(\"RELOADED\"));"),
+ ("spinRoll guard removed",      "if (ms < 1 || ms > ROLL_TIME_MAX * 6) {", "if (false) {"),
  ("yawPrecision 70 -> 200",        "int yawPrecision = 70;", "int yawPrecision = 200;"),
  ("pitchMoveSpeed 6 -> 20",        "int pitchMoveSpeed = 6;", "int pitchMoveSpeed = 20;"),
 ]

@@ -3,3 +3,6 @@ tools/community_sketch.cpp
 tools/tests
 tools/ctests
 tools/mut
+tools/fit.pkl
+__pycache__/
+*.pyc
