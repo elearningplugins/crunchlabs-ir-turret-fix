@@ -1,5 +1,4 @@
-# Keeps the pinned action SHAs from going stale. Dependabot opens a pull request
-# when a new release lands, updating the SHA and the version comment together.
+# keeps the pinned action SHAs from going stale by opening a PR when a new release lands
 version: 2
 updates:
   - package-ecosystem: github-actions

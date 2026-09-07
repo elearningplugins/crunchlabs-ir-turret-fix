@@ -24,8 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # v2.0.0 is the latest release and still targets Node 20, so GitHub logs a
-      # deprecation warning for this step. Nothing to bump until upstream ships a new major.
+      # v2.0.0 is the latest release and still targets Node 20, so the deprecation warning stays until upstream ships a new major
       - uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2.0.0
       - name: Install core and libraries
         run: |

@@ -37,9 +37,7 @@
 
 #include <Arduino.h>
 #include <Servo.h>
-//DECODE_NEC must be defined BEFORE IRremote.hpp is included, or the library compiles its whole
-//default protocol set instead of just NEC - that wastes flash and lets other protocols' command
-//bytes reach our handler. Check the boot banner: it should list NEC only.
+//DECODE_NEC must come before IRremote.hpp or the library builds every protocol instead of just NEC
 #define DECODE_NEC
 #include <IRremote.hpp>
 
@@ -98,8 +96,7 @@ int yawStopSpeed = 90; //value to stop the yaw motor - keep this at 90
 int rollMoveSpeed = 90; //this variable is the speed controller for the continuous movement of the ROLL servo motor. It is added or subtracted from the rollStopSpeed, so 0 would mean full speed rotation in one direction, and 180 means full rotation in the other. Keep this at 90 for best performance / highest torque from the roll motor when firing.
 int rollStopSpeed = 90; //value to stop the roll motor - keep this at 90
 
-//safe limits for the live tuning keys - a negative or absurd run time would be handed to delay(),
-//which takes an unsigned long, so a negative value wraps to roughly 49 days of full speed rotation
+//clamps for the tuning keys, since delay() takes an unsigned long and a negative value wraps to about 49 days
 #define ROLL_TIME_MIN 60    // ms, shorter than this cannot move a chamber
 #define ROLL_TIME_MAX 600   // ms, longer than this overshoots wildly
 #define ROLL_STEP_MIN -40   // ms per shot
@@ -268,10 +265,7 @@ void handleCommand(int command, bool isRepeat) {
           //  DEBUG / SERIAL CONTROL  //
 //////////////////////////////////////////////////
 #pragma region DEBUG
-/*
-** This region exists only for debugging over USB. It does not touch the IR path -
-** the remote keeps working exactly as before. Delete this region to get the clean sketch back.
-*/
+//this region is USB debugging only and does not touch the IR path, so deleting it restores the clean sketch
 
 void printStatus() {
     Serial.print(F("STATUS pitch="));
@@ -295,9 +289,7 @@ void printStatus() {
 }
 
 void timedFire() { //fires one dart and reports the commanded run time for this shot
-    //NOTE: this measures how long the code ran the servo, NOT how far the barrel actually turned.
-    //A continuous rotation servo reports no position, so a stalled barrel produces the same numbers
-    //as a healthy one. Only your eyes can tell whether the chamber advanced.
+    //this is commanded time, not rotation, because a stalled barrel reports exactly the same numbers
     int commanded = constrainRollTime(rollPrecision + (rollStep * dartsFired));
     unsigned long t0 = millis();
     fire();
