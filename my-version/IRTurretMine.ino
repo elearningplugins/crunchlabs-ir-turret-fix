@@ -115,11 +115,14 @@ int rollStopSpeed = 90; //value to stop the roll motor - keep this at 90
 #define ROLL_TIME_MAX 600   // ms, longer than this overshoots wildly
 #define ROLL_STEP_MIN -40   // ms per shot
 #define ROLL_STEP_MAX 40
+#define ROLL_KICK_MAX 150  // ms, a longer back-up spins the barrel too far the wrong way
 
 int rollStep = 10; //ms added to rollPrecision for each dart already fired - positive rolls LONGER as the magazine empties
 int dartsFired = 0; //how many shots since the last reload, so the ramp knows where it is in the magazine
 
 int yawPrecision = 70; // this variable represents the time in milliseconds that the YAW motor will remain at it's set movement speed. Try values between 50 and 500 to start (500 milliseconds = 1/2 second)
+int rollKickMs = 40; //ms the barrel backs up before the first shot of a magazine, so it gets a run at the magnets' grip instead of starting dead still - 0 turns it off
+int rollKickLaterMs = 20; //ms the barrel backs up before each later shot, smaller because the barrel has only just stopped - 0 turns it off
 int rollPrecision = 240; // this variable represents the time in milliseconds that the ROLL motor with remain at it's set movement speed. If this ROLL motor is spinning more or less than 1/6th of a rotation when firing a single dart (one call of the fire(); command) you can try adjusting this value down or up slightly, but it should remain around the stock value (160ish) for best results.
 
 int pitchMax = 150; // this sets the maximum angle of the pitch servo to prevent it from crashing, it should remain below 180, and be greater than the pitchMin
@@ -375,6 +378,10 @@ void printStatus() {
     Serial.print(rollPrecision);
     Serial.print(F(" rollStep="));
     Serial.print(rollStep);
+    Serial.print(F(" rollKick="));
+    Serial.print(rollKickMs);
+    Serial.print(F(" rollKickLater="));
+    Serial.print(rollKickLaterMs);
     Serial.print(F(" dartsFired="));
     Serial.print(dartsFired);
     Serial.print(F(" uptime="));
@@ -446,6 +453,10 @@ void handleSerial() {
         //ramp tuning: k/K change how much each successive shot is lengthened, z resets the magazine counter
         case 'k': rollStep = max(ROLL_STEP_MIN, rollStep - 2); Serial.print(F("rollStep=")); Serial.println(rollStep); return;
         case 'K': rollStep = min(ROLL_STEP_MAX, rollStep + 2); Serial.print(F("rollStep=")); Serial.println(rollStep); return;
+        case 'j': rollKickMs = max(0, rollKickMs - 10); Serial.print(F("rollKick=")); Serial.println(rollKickMs); return;
+        case 'J': rollKickMs = min(ROLL_KICK_MAX, rollKickMs + 10); Serial.print(F("rollKick=")); Serial.println(rollKickMs); return;
+        case 'g': rollKickLaterMs = max(0, rollKickLaterMs - 10); Serial.print(F("rollKickLater=")); Serial.println(rollKickLaterMs); return;
+        case 'G': rollKickLaterMs = min(ROLL_KICK_MAX, rollKickLaterMs + 10); Serial.print(F("rollKickLater=")); Serial.println(rollKickLaterMs); return;
         case 'z': dartsFired = 0; Serial.println(F("magazine counter reset")); return;
 
         //calibration spins: measure how far the barrel really goes under load
@@ -471,7 +482,7 @@ void handleSerial() {
         }
 
         case '?': //help
-            Serial.println(F("KEYS u/d/l/r=aim f=fire a=fireAll x=lock 0-9=digits s=status t=fire T=top B=bottom [/]=rollPrecision+-10 </>=rollPrecision+-2 k/K=rollStep+-2 z=reset mag R=spin1s H=one chamber F=full turn"));
+            Serial.println(F("KEYS u/d/l/r=aim f=fire a=fireAll x=lock 0-9=digits s=status t=fire T=top B=bottom [/]=rollPrecision+-10 </>=rollPrecision+-2 k/K=rollStep+-2 j/J=rollKick+-10 g/G=rollKickLater+-10 z=reset mag R=spin1s H=one chamber F=full turn"));
             return;
 
         default: return; //ignore newlines and anything unmapped
@@ -531,11 +542,20 @@ void downMove (int moves){ // function to tilt down
   }
 }
 
+void kickBack(int ms) { //backs the barrel up for ms so it breaks free of the magnets with a run-up
+    if (ms > 0) {
+        rollServo.write(rollStopSpeed - rollMoveSpeed); //full speed the wrong way
+        delay(ms);
+    }
+}
+
 void fire() { //function for firing a single dart
     int thisShot = rollPrecision + (rollStep * dartsFired); //ramp the time as the magazine empties
     thisShot = constrainRollTime(thisShot); //never hand delay() a negative or runaway value
+    int kick = (dartsFired == 0) ? rollKickMs : rollKickLaterMs; //the first shot of a magazine gets the full kick, later shots a smaller one
+    kickBack(kick);
     rollServo.write(rollStopSpeed + rollMoveSpeed);//start rotating the servo
-    delay(thisShot);//time for approximately 60 degrees of rotation
+    delay(thisShot + kick);//one chamber of rotation, plus the ground the kick gave up
     rollServo.write(rollStopSpeed);//stop rotating the servo
     delay(5); //delay for smoothness
     if (dartsFired < 6) { //stop climbing once the magazine is spent
@@ -549,8 +569,9 @@ void fire() { //function for firing a single dart
 }
 
 void fireAll() { //function to fire all 6 darts at once
+    kickBack(rollKickMs);
     rollServo.write(rollStopSpeed + rollMoveSpeed);//start rotating the servo
-    delay(constrainRollTime(rollPrecision) * 6); //time for 360 degrees of rotation
+    delay(constrainRollTime(rollPrecision) * 6 + rollKickMs); //a full turn, plus the ground the kick gave up
     rollServo.write(rollStopSpeed);//stop rotating the servo
     delay(5); // delay for smoothness
     //Serial.println("FIRING ALL");

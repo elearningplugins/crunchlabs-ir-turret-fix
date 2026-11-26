@@ -62,6 +62,8 @@ exclusive WebSerial access. `lsof /dev/cu.usbserial-XXXX`.
 Use `IRTurret_FixedFiring.ino` from this repo. It adds single-character serial control
 without touching the IR path. Keys: `s` status, `t` timed fire, `[`/`]` ±10 ms, `<`/`>` ±2 ms,
 `k`/`K` ramp ±2, `z` reset magazine counter, `H`/`F` calibration spins, `T`/`B` pitch limits.
+The passcode build also has `j`/`J` (first-shot reverse kick ±10 ms) and `g`/`G` (later-shot
+reverse kick ±10 ms). Try a kick when the barrel sometimes does not move at all.
 
 ## Step 3. Rule out power
 
