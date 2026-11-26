@@ -33,6 +33,15 @@ MUTANTS = [
  ("spinRoll guard removed",      "if (ms < 1 || ms > ROLL_TIME_MAX * 6) {", "if (false) {"),
  ("yawPrecision 70 -> 200",        "int yawPrecision = 70;", "int yawPrecision = 200;"),
  ("pitchMoveSpeed 6 -> 20",        "int pitchMoveSpeed = 6;", "int pitchMoveSpeed = 20;"),
+ ("kick spins forward",           "rollServo.write(rollStopSpeed - rollMoveSpeed); //full speed", "rollServo.write(rollStopSpeed + rollMoveSpeed); //full speed"),
+ ("kick guard > -> >=",            "if (ms > 0) {", "if (ms >= 0) {"),
+ ("kick not won back",             "delay(thisShot + kick);", "delay(thisShot);"),
+ ("later shots get the full kick", "(dartsFired == 0) ? rollKickMs : rollKickLaterMs;", "rollKickMs;"),
+ ("later shots get no kick",       "(dartsFired == 0) ? rollKickMs : rollKickLaterMs;", "(dartsFired == 0) ? rollKickMs : 0;"),
+ ("rollKickLaterMs 20 -> 0",       "int rollKickLaterMs = 20;", "int rollKickLaterMs = 0;"),
+ ("kick G unclamped",              "rollKickLaterMs = min(ROLL_KICK_MAX, rollKickLaterMs + 10);", "rollKickLaterMs = rollKickLaterMs + 10;"),
+ ("rollKickMs 40 -> 0",            "int rollKickMs = 40;", "int rollKickMs = 0;"),
+ ("kick J unclamped",              "rollKickMs = min(ROLL_KICK_MAX, rollKickMs + 10);", "rollKickMs = rollKickMs + 10;"),
 ]
 
 killed=survived=invalid=0

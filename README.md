@@ -161,6 +161,7 @@ all**, so anyone with a USB cable can operate a locked turret.
 | Repeat flag captured before `resume()` | Race that could double count or drop held presses |
 | `yawPrecision` 150 to 70 | Left and right blocked for 150 ms per press |
 | Live serial tuning | Change values over USB without uploading again |
+| Reverse kick before each shot (passcode sketch) | Barrel stuck to the magnets and did not move at all |
 
 ## Other things to check before you blame the code
 
@@ -204,6 +205,8 @@ or any terminal and press keys:
 | `<` `>` | `rollPrecision` down 2 / up 2 |
 | `k` `K` | `rollStep` down 2 / up 2 |
 | `z` | Reset the magazine counter after reloading |
+| `j` `J` | First shot's reverse kick down 10 / up 10 (passcode sketch only) |
+| `g` `G` | Later shots' reverse kick down 10 / up 10 (passcode sketch only) |
 | `H` | Spin one chamber's worth |
 | `F` | Spin a full turn's worth |
 | `T` `B` | Drive pitch to top / bottom and report the angle |
@@ -216,6 +219,25 @@ Both values are clamped. `rollPrecision` is held between 60 and 600 ms and `roll
 40 and 40, and the final per shot time is clamped again before it reaches `delay()`. Without that, a
 negative value would wrap to about 49 days of full speed rotation, since `delay()` takes an unsigned
 argument.
+
+### Reverse kick (passcode sketch only)
+
+A barrel that sometimes will not move at all is usually failing to break away from the magnets
+that hold it between shots. The passcode sketch backs the barrel up briefly before each shot, then
+drives it forward for the normal time plus the kick, so it still lands one chamber on:
+
+```cpp
+int rollKickMs      = 40;  // back-up before the first shot of a magazine, ms
+int rollKickLaterMs = 20;  // back-up before each later shot, ms
+```
+
+The first shot starts from a full stop, so it gets the larger kick. Set either to 0 to turn it off.
+Both are held between 0 and 150 ms. With the remote, press `0` after reloading so the next shot
+counts as the first.
+
+On one turret that fired exactly 3 of 6 on every magazine without a kick, a 40 ms kick on every shot
+fired 5 and then 4. A 40 ms kick on the first shot only fired 4, and both misses were shots without
+a kick.
 
 ### Procedure
 

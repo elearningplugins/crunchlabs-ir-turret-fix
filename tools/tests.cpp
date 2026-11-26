@@ -13,7 +13,7 @@ static void press(int cmd, bool repeat=false){
 }
 static void reset_state(){
     passcodeEntered = false; passcode[0]='\0';
-    dartsFired = 0; rollPrecision = 240; rollStep = 10;
+    dartsFired = 0; rollPrecision = 240; rollStep = 10; rollKickMs = 40; rollKickLaterMs = 20;
     pitchServoVal = 100; pitchServo.writes.clear();
     yawServo.writes.clear(); rollServo.writes.clear();
     pitchServo.attached = yawServo.attached = rollServo.attached = true;
@@ -36,6 +36,8 @@ int main(){
     // capture the values the sketch was compiled with, before any test overwrites them
     const int COMPILED_ROLL_PRECISION = rollPrecision;
     const int COMPILED_ROLL_STEP      = rollStep;
+    const int COMPILED_ROLL_KICK      = rollKickMs;
+    const int COMPILED_ROLL_KICK_LATER = rollKickLaterMs;
 
     printf("=== 1. passcode state machine ===\n");
     reset_state();
@@ -268,13 +270,15 @@ int main(){
     CHECK(COMPILED_ROLL_PRECISION == 240, "rollPrecision must be compiled as the tuned 240");
     CHECK(COMPILED_ROLL_STEP == 10, "rollStep must be compiled as the tuned +10");
     CHECK(rollMoveSpeed == 90 && rollStopSpeed == 90, "roll must stay at full speed");
+    CHECK(COMPILED_ROLL_KICK == 40, "rollKickMs must be compiled as 40");
+    CHECK(COMPILED_ROLL_KICK_LATER == 20, "rollKickLaterMs must be compiled as 20");
 
     printf("=== 20. firing timing (virtual clock) ===\n");
     reset_state(); unlock(); dartsFired=0;
     { unsigned long t0=g_virtual_ms; fire();
       unsigned long d=g_virtual_ms-t0;
       CHECK(d >= (unsigned long)rollPrecision, "fire() must run the barrel for rollPrecision ms");
-      CHECK(d < (unsigned long)rollPrecision+50, "fire() must not dawdle beyond rollPrecision");
+      CHECK(d < (unsigned long)(rollPrecision + 2*rollKickMs + 50), "fire() must not dawdle beyond the kick plus rollPrecision");
       printf("  fire() = %lu ms\n", d); }
     { unsigned long t0=g_virtual_ms; fireAll();
       unsigned long d=g_virtual_ms-t0;
@@ -314,7 +318,7 @@ int main(){
 
     printf("=== 24. the per-shot ramp ===\n");
     {
-        reset_state(); unlock(); dartsFired = 0;
+        reset_state(); unlock(); dartsFired = 0; rollKickMs = 0; rollKickLaterMs = 0; // the kicks are covered by test 27
         int times[6];
         for(int n=0;n<6;n++){
             unsigned long t0=g_virtual_ms;
@@ -370,6 +374,52 @@ int main(){
         CHECK(g_virtual_ms==t0, "spinRoll must refuse a runaway duration");
         t0=g_virtual_ms; spinRoll(200);
         CHECK(g_virtual_ms-t0==200, "spinRoll must run a sane duration");
+    }
+
+    printf("=== 27. full kick before the first shot, a smaller one before the rest ===\n");
+    {
+        reset_state(); unlock(); rollServo.writes.clear();
+        unsigned long t0=g_virtual_ms; fire(); unsigned long d=g_virtual_ms-t0;
+        CHECK(rollServo.writes.size()>=3 && rollServo.writes[0]==rollStopSpeed-rollMoveSpeed, "fire() must back the barrel up first");
+        CHECK(rollServo.writes.size()>=3 && rollServo.writes[1]==rollStopSpeed+rollMoveSpeed, "fire() must then drive the barrel forward");
+        CHECK(rollServo.last==rollStopSpeed, "fire() must leave the barrel stopped");
+        CHECK(d == (unsigned long)(rollKickMs + rollPrecision + rollKickMs + 5), "forward run must win back the kick plus one chamber");
+        reset_state(); unlock(); rollServo.writes.clear(); dartsFired = 2;
+        t0=g_virtual_ms; fire(); d=g_virtual_ms-t0;
+        CHECK(!rollServo.writes.empty() && rollServo.writes[0]==rollStopSpeed-rollMoveSpeed, "a later shot must back up too");
+        CHECK(d == (unsigned long)(rollKickLaterMs + rollPrecision + rollStep*2 + rollKickLaterMs + 5), "a later shot must use the smaller kick and win it back");
+        reset_state(); unlock(); fire(); rollServo.writes.clear();
+        t0=g_virtual_ms; fire(); d=g_virtual_ms-t0;
+        CHECK(!rollServo.writes.empty() && rollServo.writes[0]==rollStopSpeed-rollMoveSpeed, "the second shot must back up");
+        CHECK(d == (unsigned long)(rollKickLaterMs + rollPrecision + rollStep + rollKickLaterMs + 5), "the second shot must use the smaller kick");
+        reset_state(); unlock(); rollServo.writes.clear(); rollKickLaterMs = 0; dartsFired = 3;
+        fire();
+        CHECK(!rollServo.writes.empty() && rollServo.writes[0]==rollStopSpeed+rollMoveSpeed, "a zero later kick must not reverse a later shot");
+        reset_state(); unlock(); rollServo.writes.clear(); rollKickMs = 0;
+        t0=g_virtual_ms; fire(); d=g_virtual_ms-t0;
+        CHECK(!rollServo.writes.empty() && rollServo.writes[0]==rollStopSpeed+rollMoveSpeed, "a zero kick must not reverse");
+        CHECK(d == (unsigned long)(rollPrecision + 5), "a zero kick must leave the shot time unchanged");
+        reset_state(); unlock(); rollServo.writes.clear();
+        t0=g_virtual_ms; fireAll(); d=g_virtual_ms-t0;
+        CHECK(!rollServo.writes.empty() && rollServo.writes[0]==rollStopSpeed-rollMoveSpeed, "fireAll() must back the barrel up first");
+        CHECK(d == (unsigned long)(rollKickMs + rollPrecision*6 + rollKickMs + 5), "fireAll() must win back the kick plus a full turn");
+        reset_state(); rollServo.writes.clear(); rollKickMs = 40; Serial.inbuf = "J"; handleSerial();
+        CHECK(rollKickMs == 50, "J must add 10 ms of kick");
+        Serial.inbuf = "j"; handleSerial();
+        CHECK(rollKickMs == 40, "j must remove 10 ms of kick");
+        rollKickMs = 0; Serial.inbuf = "j"; handleSerial();
+        CHECK(rollKickMs == 0, "j must not take the kick below zero");
+        rollKickMs = ROLL_KICK_MAX; Serial.inbuf = "J"; handleSerial();
+        CHECK(rollKickMs == ROLL_KICK_MAX, "J must not take the kick past ROLL_KICK_MAX");
+        rollKickLaterMs = 20; Serial.inbuf = "G"; handleSerial();
+        CHECK(rollKickLaterMs == 30, "G must add 10 ms of later kick");
+        Serial.inbuf = "g"; handleSerial();
+        CHECK(rollKickLaterMs == 20, "g must remove 10 ms of later kick");
+        rollKickLaterMs = 0; Serial.inbuf = "g"; handleSerial();
+        CHECK(rollKickLaterMs == 0, "g must not take the later kick below zero");
+        rollKickLaterMs = ROLL_KICK_MAX; Serial.inbuf = "G"; handleSerial();
+        CHECK(rollKickLaterMs == ROLL_KICK_MAX, "G must not take the later kick past ROLL_KICK_MAX");
+        CHECK(rollServo.writes.empty(), "tuning the kick must not move the barrel");
     }
 
     printf("\n%d checks, %d failures\n", checks, failures);
